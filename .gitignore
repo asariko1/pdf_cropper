@@ -8,7 +8,7 @@ pdf_crop.html
 # macOS
 .DS_Store
 
-# VS Code
+# VS Code (optional)
 .vscode/
 
 # Logs

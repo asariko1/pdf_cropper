@@ -1,0 +1,19 @@
+# Claude local files
+.claude/
+
+# Local test files
+hello_test.html
+pdf_crop.html
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.*

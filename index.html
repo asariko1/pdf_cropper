@@ -1,30 +1,142 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
 <meta charset="UTF-8">
-<title>PDF Crop</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PDF Crop | asariko</title>
+<meta name="description" content="PDF Crop — open a PDF, drag a rectangle, save the crop as a new PDF. All processing happens locally in your browser." />
+
+<!-- Logo -->
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="favicon.png">
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Icons -->
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<!-- Tailwind CSS — prebuilt with the Tailwind CLI. Rebuild after editing classes with:
+     npx tailwindcss@3 -c tailwind.config.js -i in.css -o tailwind.css --minify -->
+<link rel="stylesheet" href="tailwind.css">
+
+<!-- Custom CSS -->
+<link rel="stylesheet" href="style.css">
+
 <style>
+  /* --- asariko theme overrides --- */
+  h1.text-slate-900,
+  h2.text-slate-900 { color: #2c3e50 !important; }
+  header a.text-slate-900 { color: #2c3e50 !important; }
+
+  /* --- App shell (unchanged behaviour: toolbar + independently scrolling stage) --- */
   html, body { height: 100%; }
-  body { font-family: -apple-system, Segoe UI, Arial, sans-serif; margin: 0; background: #f2f2f2; color: #222; display: flex; flex-direction: column; }
-  #toolbar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #fff; border-bottom: 1px solid #ddd; flex-wrap: wrap; flex: 0 0 auto; }
-  #toolbar button { padding: 8px 14px; border: 1px solid #999; background: #fafafa; border-radius: 4px; cursor: pointer; font-size: 14px; }
-  #toolbar button:hover { background: #eee; }
-  #toolbar button:disabled { opacity: 0.5; cursor: not-allowed; }
-  #fileName { color: #555; font-size: 13px; margin-left: 4px; }
-  #hint { font-size: 13px; color: #777; margin-left: auto; }
-  #stage { flex: 1 1 auto; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 24px; }
-  .pageWrap { position: relative; box-shadow: 0 2px 10px rgba(0,0,0,0.2); background: #fff; flex: 0 0 auto; }
+  body {
+    margin: 0;
+    background: #ffffff;
+    color: #0f172a;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* The site header sits in the flex column as a normal row, so #stage keeps its
+     own scrollbar. It is deliberately NOT position:fixed. */
+  #navbar { flex: 0 0 auto; }
+
+  #toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 24px;
+    background: #ffffff;
+    border-top: 1px solid #f1f5f9;
+    border-bottom: 1px solid #f1f5f9;
+    flex-wrap: wrap;
+    flex: 0 0 auto;
+  }
+  #toolbar button {
+    padding: 9px 16px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #2c3e50;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  #toolbar button:hover:not(:disabled) {
+    background: #2c3e50;
+    border-color: #2c3e50;
+    color: #ffffff;
+  }
+  #toolbar button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  #fileName { color: #475569; font-size: 13px; margin-left: 4px; font-weight: 500; }
+  #hint { font-size: 13px; color: #94a3b8; margin-left: auto; }
+
+  #stage {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    padding: 24px;
+    background: #f8fafc;
+  }
+  .pageWrap {
+    position: relative;
+    box-shadow: 0 8px 30px rgb(0 0 0 / 0.10);
+    background: #fff;
+    border-radius: 4px;
+    flex: 0 0 auto;
+  }
   .pageCanvas { display: block; }
   .selCanvas { position: absolute; top: 0; left: 0; cursor: crosshair; }
-  #empty { text-align: center; color: #888; padding: 80px 20px; font-size: 15px; }
-  #stage.dragover { outline: 3px dashed #4a90d9; outline-offset: -8px; }
-  footer { flex: 0 0 auto; text-align: center; padding: 14px 20px; font-size: 13px; color: #666; background: #fff; border-top: 1px solid #ddd; }
-  footer p { margin: 4px 0; }
-  footer a { color: #007bff; text-decoration: none; }
-  footer a:hover { text-decoration: underline; }
+
+  #empty { text-align: center; color: #94a3b8; padding: 80px 20px; font-size: 15px; }
+  #stage.dragover { outline: 3px dashed #2c3e50; outline-offset: -8px; }
+
+  footer { flex: 0 0 auto; }
 </style>
 </head>
-<body>
+
+<body class="bg-white text-slate-900 selection:bg-slate-200 selection:text-slate-900 font-sans">
+
+<!-- Navbar (static, not fixed — keeps the app shell layout intact) -->
+<header id="navbar" class="relative z-50 bg-white py-5">
+  <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 flex items-center justify-between">
+    <a href="https://asariko.net" class="z-50 relative">
+      <img src="assets/logo.png" alt="asariko logo" class="h-10 md:h-12 w-auto">
+    </a>
+
+    <!-- Desktop Nav -->
+    <nav class="hidden md:flex items-center gap-8">
+      <a href="https://asariko.net" class="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">Home</a>
+      <a href="https://asariko.net/projects" class="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">Projects</a>
+      <a href="https://asariko.net/#about" class="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">About</a>
+      <a href="https://asariko.net/#contact" class="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">Contact</a>
+    </nav>
+
+    <!-- Mobile Menu Button -->
+    <button id="mobile-menu-btn" class="md:hidden text-slate-900 p-2 z-50 relative" aria-label="Toggle menu">
+      <i data-lucide="menu" class="w-6 h-6"></i>
+    </button>
+  </div>
+
+  <!-- Mobile Nav Overlay -->
+  <div id="mobile-menu" class="fixed top-0 left-0 w-screen h-screen bg-white/70 backdrop-blur-sm z-40 flex-col items-center justify-center gap-8 hidden opacity-0 transition-opacity duration-300">
+    <a href="https://asariko.net" class="mobile-link text-2xl font-medium text-slate-900">Home</a>
+    <a href="https://asariko.net/projects" class="mobile-link text-2xl font-medium text-slate-900">Projects</a>
+    <a href="https://asariko.net/#about" class="mobile-link text-2xl font-medium text-slate-900">About</a>
+    <a href="https://asariko.net/#contact" class="mobile-link text-2xl font-medium text-slate-900">Contact</a>
+  </div>
+</header>
 
 <div id="toolbar">
   <button id="openBtn">Open PDF...</button>
@@ -354,14 +466,42 @@ window.__PDF_WORKER_B64__ = "LyoqCiAqIEBsaWNzdGFydCBUaGUgZm9sbG93aW5nIGlzIHRoZSB
 })();
 </script>
 
-<footer>
-    <p>&copy; 2026 Asariko.net | Licensed under MIT</p>
-    <p>
-        <a href="https://github.com/asariko1/pdf_cropper.git" target="_blank" rel="noopener">
-            View Source on GitHub (Verify Privacy)
+<footer class="py-6 text-slate-400 text-sm border-t border-slate-100 bg-white">
+  <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 flex flex-col gap-4">
+
+    <div class="flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:items-center sm:text-left">
+      <span>&copy; <span id="year"></span> asariko</span>
+
+      <div class="flex flex-col items-center gap-2 sm:flex-row sm:gap-4 sm:justify-end">
+        <span>Built with simplicity</span>
+
+        <div class="flex items-center gap-2">
+          <a href="https://asariko.net/terms" class="hover:text-slate-900 transition-colors">Terms</a>
+          <span class="text-slate-300">·</span>
+          <a href="https://asariko.net/privacy" class="hover:text-slate-900 transition-colors">Privacy</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col items-center gap-1.5 text-center text-xs text-slate-400">
+      <p>&copy; 2026 Asariko.net | Licensed under MIT</p>
+      <p>
+        <a href="https://github.com/asariko1/pdf_cropper.git" target="_blank" rel="noopener" class="hover:text-slate-900 transition-colors underline underline-offset-2">
+          View Source on GitHub (Verify Privacy)
         </a>
-    </p>
-    <p><i>All processing happens locally in your browser. No files are ever uploaded or stored on a server.</i></p>
+      </p>
+      <p class="italic">All processing happens locally in your browser. No files are ever uploaded or stored on a server.</p>
+    </div>
+
+  </div>
 </footer>
+
+<!-- Shared site behavior: mobile menu -->
+<script src="script.js"></script>
+
+<script>
+  lucide.createIcons();
+  document.getElementById("year").textContent = new Date().getFullYear();
+</script>
 </body>
 </html>
